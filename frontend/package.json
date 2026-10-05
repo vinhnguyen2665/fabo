@@ -1,0 +1,20 @@
+{
+  "name": "fabo-pos-platform-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fabo POS Cloud Frontend Monorepo (React 19 + TypeScript + Vite + Tailwind CSS)",
+  "scripts": {
+    "dev:pos": "pnpm --filter @fabo/pos-cashier dev",
+    "dev:kds": "pnpm --filter @fabo/kds-kitchen dev",
+    "dev:admin": "pnpm --filter @fabo/admin-portal dev",
+    "dev:customer": "pnpm --filter @fabo/customer-qr dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.2",
+    "typescript": "^5.6.2"
+  },
+  "packageManager": "pnpm@12.9.1"
+}

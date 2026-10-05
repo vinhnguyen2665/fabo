@@ -1,0 +1,17 @@
+{
+  "name": "@fabo/websocket",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@stomp/stompjs": "^7.0.0",
+    "sockjs-client": "^1.6.1"
+  },
+  "devDependencies": {
+    "@types/sockjs-client": "^1.5.4",
+    "react": "^19.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  }
+}

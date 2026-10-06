@@ -14,6 +14,12 @@ export interface DiningTableDto {
   capacity: number;
   activeOrderId?: string;
   occupiedSince?: string;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  shape?: string;
+  rotation?: number;
 }
 
 export interface MenuItemDto {
@@ -107,3 +113,46 @@ export interface PaymentCompletedEventDto {
   transactionRef: string;
   completedAt: string;
 }
+
+export type StaffRole = 'STORE_MANAGER' | 'ADMIN' | 'CASHIER' | 'WAITER' | 'CHEF';
+
+export interface StaffDto {
+  id: string;
+  fullName: string;
+  username: string;
+  role: StaffRole;
+  pinCode?: string;
+  branchId?: string;
+  avatarUrl?: string;
+}
+
+export interface CashierSessionDto {
+  staff: StaffDto;
+  initialCash: number;
+  openedAt: string;
+  shiftId?: string;
+}
+
+export interface TableLayoutDto {
+  id: string;
+  posX: number;
+  posY: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+}
+
+export interface CreateTableRequestDto {
+  id?: string;
+  tableName: string;
+  areaId: string;
+  areaName: string;
+  branchId?: string;
+  capacity: number;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  shape?: 'RECTANGLE' | 'ROUND';
+}
+

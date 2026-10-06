@@ -214,7 +214,11 @@ java backend/fabo-payment-service/src/test/java/dev/c9tech/fabo/test/StandaloneV
    ```bash
    pnpm build
    ```
-
+```
+Đối với Lê Hoàng Long (Quản lý): Bấm số 9999
+Đối với Trần Thu Hà (Thu ngân): Bấm số 1234
+Đối với Nguyễn Văn Nam (Thu ngân): Bấm số 5678 (Có thể bấm bằng chuột trên bàn phím số cảm ứng hoặc bấm trực tiếp phím số trên bàn phím máy tính).
+```
 ---
 
 ## 🚀 CÁC TÍNH NĂNG & GIẢI THUẬT TRỌNG YẾU

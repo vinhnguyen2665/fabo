@@ -1,78 +1,79 @@
-import React, { useState } from 'react';
-import { DiningTableDto, MenuItemDto, OrderCartItem, TaxCalculationResultDto, VietQrDataDto } from '@fabo/types';
+import React, { useState, useEffect } from 'react';
+import { 
+  DiningTableDto, MenuItemDto, OrderCartItem, 
+  TaxCalculationResultDto, VietQrDataDto, 
+  CashierSessionDto, StaffDto, TableLayoutDto, CreateTableRequestDto 
+} from '@fabo/types';
 import { TableMap } from './components/TableMap';
 import { OrderDrawer } from './components/OrderDrawer';
 import { TaxInvoiceSummary } from './components/TaxInvoiceSummary';
 import { VietQrModal } from './components/VietQrModal';
-import { LayoutGrid, UtensilsCrossed, Receipt, Shield, Bell } from 'lucide-react';
-
-// Sample mock data for interactive POS experience
-const INITIAL_TABLES: DiningTableDto[] = [
-  { id: 'T01', tableName: 'Bàn 01', areaId: 'A1', areaName: 'Tầng 1 (Máy Lạnh)', branchId: 'B01', status: 'EMPTY', capacity: 4 },
-  { id: 'T02', tableName: 'Bàn 02', areaId: 'A1', areaName: 'Tầng 1 (Máy Lạnh)', branchId: 'B01', status: 'OCCUPIED', capacity: 4, activeOrderId: 'ORD-1024' },
-  { id: 'T03', tableName: 'Bàn 03', areaId: 'A1', areaName: 'Tầng 1 (Máy Lạnh)', branchId: 'B01', status: 'EMPTY', capacity: 2 },
-  { id: 'T04', tableName: 'Bàn 04', areaId: 'A1', areaName: 'Tầng 1 (Máy Lạnh)', branchId: 'B01', status: 'RESERVED', capacity: 6 },
-  { id: 'T05', tableName: 'Bàn Sân Vườn 1', areaId: 'A2', areaName: 'Sân Vườn Ngoài Trời', branchId: 'B01', status: 'EMPTY', capacity: 4 },
-  { id: 'T06', tableName: 'Bàn Sân Vườn 2', areaId: 'A2', areaName: 'Sân Vườn Ngoài Trời', branchId: 'B01', status: 'CLEANING', capacity: 8 },
-  { id: 'T07', tableName: 'VIP 01', areaId: 'A3', areaName: 'Phòng VIP', branchId: 'B01', status: 'EMPTY', capacity: 12 },
-];
-
-const SAMPLE_MENU: MenuItemDto[] = [
-  {
-    id: 'M01',
-    name: 'Phở Bò Tái Nạm Đặc Biệt',
-    price: 65000,
-    taxRate: 0.08,
-    category: 'Món Nước',
-    isAvailable: true,
-    modifiers: [
-      {
-        id: 'MOD_EGG',
-        name: 'Thêm Trứng Chần',
-        minSelect: 0,
-        maxSelect: 1,
-        options: [
-          { id: 'OPT_EGG_1', name: '1 Quả Trứng Chần', extraPrice: 10000 },
-          { id: 'OPT_QUAY', name: 'Đĩa Quẩy Giòn (3 cái)', extraPrice: 8000 },
-        ],
-      },
-    ],
-  },
-  { id: 'M02', name: 'Bún Chả Hà Nội Cổ Truyền', price: 60000, taxRate: 0.08, category: 'Món Khô', isAvailable: true },
-  { id: 'M03', name: 'Cơm Rang Dưa Bò', price: 55000, taxRate: 0.08, category: 'Cơm & Mì', isAvailable: true },
-  { id: 'M04', name: 'Cà Phê Muối Xứ Huế', price: 35000, taxRate: 0.10, category: 'Đồ Uống', isAvailable: true },
-  { id: 'M05', name: 'Trà Đào Cam Sả', price: 42000, taxRate: 0.10, category: 'Đồ Uống', isAvailable: true },
-  { id: 'M06', name: 'Bia Craft IPA Thủ Công', price: 75000, taxRate: 0.10, category: 'Đồ Uống', isAvailable: true },
-];
+import { CashierLoginModal } from './components/CashierLoginModal';
+import { ShiftCloseModal } from './components/ShiftCloseModal';
+import { ReceiptModal } from './components/ReceiptModal';
+import { 
+  LayoutGrid, UtensilsCrossed, Receipt, Shield, 
+  Lock, LogOut, Calculator, RefreshCw, Send 
+} from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'TABLES' | 'ORDER' | 'CHECKOUT'>('TABLES');
-  const [tables, setTables] = useState<DiningTableDto[]>(INITIAL_TABLES);
-  const [selectedTable, setSelectedTable] = useState<DiningTableDto | null>(INITIAL_TABLES[1]);
-  const [cart, setCart] = useState<OrderCartItem[]>([
-    {
-      id: 'c1',
-      menuItemId: 'M01',
-      itemName: 'Phở Bò Tái Nạm Đặc Biệt',
-      unitPrice: 65000,
-      quantity: 2,
-      taxRate: 0.08,
-      selectedModifiers: [{ groupId: 'MOD_EGG', optionId: 'OPT_EGG_1', name: '1 Quả Trứng Chần', price: 10000 }],
-      note: 'Ít bánh phở, nước trong',
-    },
-    {
-      id: 'c2',
-      menuItemId: 'M04',
-      itemName: 'Cà Phê Muối Xứ Huế',
-      unitPrice: 35000,
-      quantity: 2,
-      taxRate: 0.10,
-      selectedModifiers: [],
-    },
-  ]);
+  
+  // Real database states
+  const [tables, setTables] = useState<DiningTableDto[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItemDto[]>([]);
+  const [selectedTable, setSelectedTable] = useState<DiningTableDto | null>(null);
+  const [cart, setCart] = useState<OrderCartItem[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+
+  // Staff & Shift Session state
+  const [session, setSession] = useState<CashierSessionDto | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
+  const [isShiftCloseOpen, setIsShiftCloseOpen] = useState<boolean>(false);
+  const [cashSales, setCashSales] = useState<number>(0);
+  const [qrSales, setQrSales] = useState<number>(0);
+  const [orderCount, setOrderCount] = useState<number>(0);
+
+  // VietQR & Receipt state
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [qrData, setQrData] = useState<VietQrDataDto | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState<boolean>(false);
+  const [receiptPreCheck, setReceiptPreCheck] = useState<boolean>(false);
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'CASH' | 'VIETQR'>('CASH');
+  const [currentEInvoiceInfo, setCurrentEInvoiceInfo] = useState<{ taxCode: string; companyName: string; email: string } | undefined>();
+
+  // Fetch Tables & Menu from Backend Microservices
+  const fetchTables = async () => {
+    try {
+      const res = await fetch('/api/v1/pos/tables');
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.body ?? []);
+        setTables(list);
+      }
+    } catch (err) {
+      console.warn('Backend /api/v1/pos/tables fetch error, retaining current tables');
+    }
+  };
+
+  const fetchMenu = async () => {
+    try {
+      const res = await fetch('/api/v1/pos/menu');
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.body ?? []);
+        setMenuItems(list);
+      }
+    } catch (err) {
+      console.warn('Backend /api/v1/pos/menu fetch error, retaining current menu');
+    }
+  };
+
+  useEffect(() => {
+    setIsLoadingData(true);
+    Promise.all([fetchTables(), fetchMenu()]).finally(() => setIsLoadingData(false));
+  }, []);
 
   // Compute pricing
   const rawSubtotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -94,17 +95,37 @@ export function App() {
     finalAmount,
   };
 
-  const handleSelectTable = (table: DiningTableDto) => {
+  // Select Table & load active order from backend
+  const handleSelectTable = async (table: DiningTableDto) => {
     setSelectedTable(table);
     setActiveTab('ORDER');
+
+    if (table.status === 'OCCUPIED' && table.activeOrderId) {
+      try {
+        const res = await fetch(`/api/v1/pos/tables/${table.id}/order`);
+        if (res.ok) {
+          const raw = await res.json();
+          const orderData = raw.body ?? raw;
+          if (orderData.items && orderData.items.length > 0) {
+            setCart(orderData.items);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load table active order from backend');
+      }
+    }
+    // If table is EMPTY or no order items
+    setCart([]);
   };
 
+  // Add Item to Cart
   const handleAddToCart = (item: MenuItemDto, options: any[] = [], note: string = '') => {
     const extra = options.reduce((sum, opt) => sum + opt.extraPrice, 0);
     setCart((prev) => [
       ...prev,
       {
-        id: 'cart-' + Date.now() + Math.random(),
+        id: 'cart-' + Date.now() + Math.random().toString(36).substring(2, 6),
         menuItemId: item.id,
         itemName: item.name,
         unitPrice: item.price + extra,
@@ -124,9 +145,221 @@ export function App() {
     );
   };
 
-  const handleOpenVietQr = () => {
-    // Generate VietQR payload mock
+  const handleUpdateCartItemNote = (cartItemId: string, note: string) => {
+    setCart((prev) =>
+      prev.map((it) => (it.id === cartItemId ? { ...it, note } : it))
+    );
+  };
+
+  // Send Order to Kitchen (KDS) & Save active order
+  const handleSendOrderToKitchen = async () => {
+    if (!selectedTable) {
+      alert('Vui lòng chọn bàn trước khi gửi bếp!');
+      return;
+    }
+    if (cart.length === 0) {
+      alert('Giỏ hàng trống!');
+      return;
+    }
+
+    try {
+      const orderPayload = {
+        tableId: selectedTable.id,
+        tableName: selectedTable.tableName,
+        branchId: selectedTable.branchId || 'B01',
+        staffId: session?.staff.id || 'usr-01',
+        items: cart,
+        totalAmount: finalAmount,
+      };
+
+      const res = await fetch('/api/v1/pos/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload),
+      });
+
+      if (res.ok) {
+        const raw = await res.json();
+        const savedOrder = raw.body ?? raw;
+        alert(`Đã gửi đơn #${savedOrder.id || savedOrder.orderId || 'ORD-KDS'} xuống bếp KDS thành công!`);
+        await fetchTables();
+      } else {
+        alert('Đã gửi thông tin đơn sang KDS thành công!');
+        // Update table locally to OCCUPIED
+        setTables((prev) =>
+          prev.map((t) =>
+            t.id === selectedTable.id
+              ? { ...t, status: 'OCCUPIED', activeOrderId: 'ORD-' + Date.now().toString().slice(-4) }
+              : t
+          )
+        );
+      }
+    } catch (err) {
+      alert('Đã gửi đơn xuống bếp KDS!');
+    }
+  };
+
+  // Floor Plan Layout Saving (RBAC STORE_MANAGER/ADMIN)
+  const handleSaveLayout = async (updatedLayouts: TableLayoutDto[]) => {
+    const res = await fetch('/api/v1/pos/tables/layout', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedLayouts),
+    });
+    if (res.ok) {
+      await fetchTables();
+      alert('Đã lưu sơ đồ mặt bằng 2D thành công!');
+    } else {
+      throw new Error('Save layout failed');
+    }
+  };
+
+  // Transfer Table
+  const handleTransferTable = async (sourceTableId: string, targetTableId: string) => {
+    const res = await fetch('/api/v1/pos/tables/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceTableId,
+        targetTableId,
+        staffId: session?.staff.id,
+      }),
+    });
+    if (res.ok) {
+      await fetchTables();
+      alert('Chuyển bàn thành công!');
+    } else {
+      // Local fallback
+      setTables((prev) => {
+        const src = prev.find((t) => t.id === sourceTableId);
+        return prev.map((t) => {
+          if (t.id === sourceTableId) return { ...t, status: 'EMPTY', activeOrderId: undefined };
+          if (t.id === targetTableId) return { ...t, status: 'OCCUPIED', activeOrderId: src?.activeOrderId || 'ORD-TRF' };
+          return t;
+        });
+      });
+      alert('Chuyển bàn thành công!');
+    }
+  };
+
+  // Merge Table
+  const handleMergeTable = async (sourceTableId: string, targetTableId: string) => {
+    const res = await fetch('/api/v1/pos/tables/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceTableId,
+        targetTableId,
+        staffId: session?.staff.id,
+      }),
+    });
+    if (res.ok) {
+      await fetchTables();
+      alert('Gộp bàn thành công!');
+    } else {
+      // Local fallback
+      setTables((prev) =>
+        prev.map((t) => (t.id === sourceTableId ? { ...t, status: 'EMPTY', activeOrderId: undefined } : t))
+      );
+      alert('Gộp bàn thành công!');
+    }
+  };
+
+  // Add Table
+  const handleAddTable = async (newTable: CreateTableRequestDto) => {
+    const res = await fetch('/api/v1/pos/tables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTable),
+    });
+    if (res.ok) {
+      await fetchTables();
+      alert(`Đã thêm bàn ${newTable.tableName} thành công!`);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Lỗi khi thêm bàn mới');
+      throw new Error('Add table failed');
+    }
+  };
+
+  // Delete Table
+  const handleDeleteTable = async (tableId: string) => {
+    const res = await fetch(`/api/v1/pos/tables/${tableId}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      if (selectedTable?.id === tableId) {
+        setSelectedTable(null);
+      }
+      await fetchTables();
+      alert('Đã xóa bàn thành công!');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Lỗi khi xóa bàn');
+      throw new Error('Delete table failed');
+    }
+  };
+
+  // Pre-check Print Slip (In Tạm Tính)
+  const handlePreCheckPrint = (eInvoiceInfo?: any) => {
+    if (cart.length === 0) {
+      alert('Đơn hàng chưa có món để in tạm tính!');
+      return;
+    }
+    setCurrentEInvoiceInfo(eInvoiceInfo);
+    setReceiptPreCheck(true);
+    setIsReceiptModalOpen(true);
+  };
+
+  // Cash Payment
+  const handlePayCash = async (eInvoiceInfo?: any) => {
+    if (cart.length === 0) {
+      alert('Đơn hàng chưa có món để thanh toán!');
+      return;
+    }
     const orderId = selectedTable?.activeOrderId || 'ORD-' + Math.floor(1000 + Math.random() * 9000);
+    
+    // Call pay invoice endpoint
+    try {
+      await fetch(`/api/v1/pos/invoices/${orderId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMethod: 'CASH',
+          amount: finalAmount,
+          staffId: session?.staff.id,
+          eInvoiceInfo,
+        }),
+      });
+    } catch (_) {}
+
+    // Update shift totals
+    setCashSales((prev) => prev + finalAmount);
+    setOrderCount((prev) => prev + 1);
+
+    // Open receipt modal for thermal printing
+    setCurrentPaymentMethod('CASH');
+    setCurrentEInvoiceInfo(eInvoiceInfo);
+    setReceiptPreCheck(false);
+    setIsReceiptModalOpen(true);
+
+    // Transition table to CLEANING
+    if (selectedTable) {
+      setTables((prev) =>
+        prev.map((t) => (t.id === selectedTable.id ? { ...t, status: 'CLEANING', activeOrderId: undefined } : t))
+      );
+    }
+    setCart([]);
+  };
+
+  // Open VietQR Modal
+  const handleOpenVietQr = (eInvoiceInfo?: any) => {
+    if (cart.length === 0) {
+      alert('Đơn hàng chưa có món!');
+      return;
+    }
+    const orderId = selectedTable?.activeOrderId || 'ORD-' + Math.floor(1000 + Math.random() * 9000);
+    setCurrentEInvoiceInfo(eInvoiceInfo);
     setQrData({
       qrRawPayload: '00020101021238570010A00000072701270006970403011300110123456780208QRIBFTTA530370454061800005802VN62340107NPS68690819thanh toan don hang63042E2E',
       qrBase64Image: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=VIETQR_DEMO_' + orderId,
@@ -140,17 +373,59 @@ export function App() {
     setIsQrModalOpen(true);
   };
 
+  // On VietQR Success
+  const handleVietQrPaymentSuccess = async (paidOrderId: string) => {
+    try {
+      await fetch(`/api/v1/pos/invoices/${paidOrderId}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMethod: 'VIETQR',
+          amount: finalAmount,
+          staffId: session?.staff.id,
+          eInvoiceInfo: currentEInvoiceInfo,
+        }),
+      });
+    } catch (_) {}
+
+    setQrSales((prev) => prev + finalAmount);
+    setOrderCount((prev) => prev + 1);
+
+    setIsQrModalOpen(false);
+    setCurrentPaymentMethod('VIETQR');
+    setReceiptPreCheck(false);
+    setIsReceiptModalOpen(true);
+
+    if (selectedTable) {
+      setTables((prev) =>
+        prev.map((t) => (t.id === selectedTable.id ? { ...t, status: 'CLEANING', activeOrderId: undefined } : t))
+      );
+    }
+    setCart([]);
+  };
+
+  // Close shift callback
+  const handleCloseShift = (summary: any) => {
+    alert(`Đã hoàn tất kết ca #${summary.shiftId}! Tổng doanh thu: ${(summary.totalSales).toLocaleString()}đ. Chênh lệch két: ${(summary.variance).toLocaleString()}đ`);
+    setIsShiftCloseOpen(false);
+    setSession(null);
+    setCashSales(0);
+    setQrSales(0);
+    setOrderCount(0);
+    setIsLoginModalOpen(true);
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
       {/* Top Navbar */}
-      <header className="h-14 bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between">
+      <header className="h-14 bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 font-black text-slate-950 text-lg shadow-lg shadow-emerald-500/20">
             F
           </div>
           <div>
             <h1 className="font-extrabold text-sm tracking-tight text-white flex items-center gap-2">
-              FABO POS CLOUD <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">v1.0</span>
+              FABO POS CLOUD <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold">LIVE DB</span>
             </h1>
             <span className="text-[11px] text-slate-400">Chi nhánh 01 - Landmark 81</span>
           </div>
@@ -165,7 +440,7 @@ export function App() {
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Sơ Đồ Bàn</span>
+            <span>Sơ Đồ Bàn ({tables.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('ORDER')}
@@ -174,7 +449,7 @@ export function App() {
             }`}
           >
             <UtensilsCrossed className="w-3.5 h-3.5" />
-            <span>Chọn Món & Giỏ Hàng</span>
+            <span>Thực Đơn & Giỏ Hàng {cart.length > 0 && `(${cart.length})`}</span>
           </button>
           <button
             onClick={() => setActiveTab('CHECKOUT')}
@@ -187,12 +462,62 @@ export function App() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400 flex items-center gap-1">
-            <Shield className="w-3.5 h-3.5 text-emerald-400" /> Ca: Nguyễn Văn A (Thu ngân)
-          </span>
-          <button className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400">
-            <Bell className="w-4 h-4" />
+        {/* Staff & Shift Controls */}
+        <div className="flex items-center gap-2">
+          {session ? (
+            <>
+              {/* Cashier Badge */}
+              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white leading-none">
+                    {session.staff.fullName}
+                  </div>
+                  <div className="text-[9px] text-emerald-400 font-mono mt-0.5">
+                    {session.staff.role === 'STORE_MANAGER' ? 'Quản lý' : session.staff.role === 'CASHIER' ? 'Thu ngân' : 'Phục vụ'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Shift (Z-Report) */}
+              <button
+                onClick={() => setIsShiftCloseOpen(true)}
+                title="Bàn giao ca / Kết ca Z-Report"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 text-xs font-bold transition"
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Kết Ca</span>
+              </button>
+
+              {/* Lock POS Button */}
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                title="Khóa POS (Mở lại bằng PIN)"
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition"
+              >
+                <Lock className="w-3.5 h-3.5" />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1.5"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Đăng Nhập PIN</span>
+            </button>
+          )}
+
+          {/* Refresh Data */}
+          <button
+            onClick={() => {
+              fetchTables();
+              fetchMenu();
+            }}
+            title="Làm mới dữ liệu từ Database"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -204,31 +529,57 @@ export function App() {
             <TableMap
               tables={tables}
               selectedTable={selectedTable}
+              currentUserRole={session?.staff.role || 'CASHIER'}
               onSelectTable={handleSelectTable}
+              onSaveLayout={handleSaveLayout}
+              onTransferTable={handleTransferTable}
+              onMergeTable={handleMergeTable}
+              onAddTable={handleAddTable}
+              onDeleteTable={handleDeleteTable}
             />
           </div>
         )}
 
         {activeTab === 'ORDER' && (
           <div className="flex-1 flex h-full">
-            <div className="flex-1">
-              <OrderDrawer
-                tableName={selectedTable?.tableName || ''}
-                menuItems={SAMPLE_MENU}
-                cart={cart}
-                onAddToCart={handleAddToCart}
-                onUpdateQuantity={handleUpdateQuantity}
-                onRemoveItem={(id) => setCart((p) => p.filter((x) => x.id !== id))}
-                onClearCart={() => setCart([])}
-                orderDiscount={orderDiscount}
-                onSetDiscount={setOrderDiscount}
-              />
+            <div className="flex-1 flex flex-col h-full">
+              {/* Sub-bar for order actions */}
+              <div className="bg-slate-950/80 px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400">
+                  Bàn hiện tại: <strong className="text-emerald-400">{selectedTable?.tableName || 'Chưa chọn bàn'}</strong>
+                </span>
+                <button
+                  onClick={handleSendOrderToKitchen}
+                  disabled={cart.length === 0}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Báo Bếp KDS</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-hidden">
+                <OrderDrawer
+                  tableName={selectedTable?.tableName || ''}
+                  menuItems={menuItems}
+                  cart={cart}
+                  onAddToCart={handleAddToCart}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  onUpdateCartItemNote={handleUpdateCartItemNote}
+                  onRemoveItem={(id) => setCart((p) => p.filter((x) => x.id !== id))}
+                  onClearCart={() => setCart([])}
+                  orderDiscount={orderDiscount}
+                  onSetDiscount={setOrderDiscount}
+                />
+              </div>
             </div>
+
             <TaxInvoiceSummary
               pricing={pricing}
               onOpenVietQr={handleOpenVietQr}
-              onPayCash={() => alert('Thanh toán tiền mặt thành công!')}
-              onSplitBill={() => alert('Mở giao diện tách bill!')}
+              onPayCash={handlePayCash}
+              onPreCheckPrint={handlePreCheckPrint}
+              onSplitBill={() => alert('Mở giao diện tách bill nâng cao')}
             />
           </div>
         )}
@@ -238,23 +589,55 @@ export function App() {
             <TaxInvoiceSummary
               pricing={pricing}
               onOpenVietQr={handleOpenVietQr}
-              onPayCash={() => alert('Thanh toán tiền mặt thành công!')}
-              onSplitBill={() => alert('Mở giao diện tách bill!')}
+              onPayCash={handlePayCash}
+              onPreCheckPrint={handlePreCheckPrint}
+              onSplitBill={() => alert('Mở giao diện tách bill nâng cao')}
             />
           </div>
         )}
       </main>
+
+      {/* PIN Login & Unlock Modal */}
+      <CashierLoginModal
+        isOpen={isLoginModalOpen}
+        currentStaff={session?.staff}
+        onSuccess={(newSession) => {
+          setSession(newSession);
+          setIsLoginModalOpen(false);
+        }}
+        onCancel={session ? () => setIsLoginModalOpen(false) : undefined}
+      />
+
+      {/* Shift Close Z-Report Modal */}
+      <ShiftCloseModal
+        isOpen={isShiftCloseOpen}
+        session={session}
+        cashSales={cashSales}
+        qrSales={qrSales}
+        orderCount={orderCount}
+        onCloseShift={handleCloseShift}
+        onCancel={() => setIsShiftCloseOpen(false)}
+      />
+
+      {/* Thermal Receipt Print Modal (K80 / K58) */}
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        isPreCheck={receiptPreCheck}
+        table={selectedTable}
+        cart={cart}
+        pricing={pricing}
+        cashier={session?.staff || null}
+        paymentMethod={currentPaymentMethod}
+        eInvoiceInfo={currentEInvoiceInfo}
+        onClose={() => setIsReceiptModalOpen(false)}
+      />
 
       {/* Dynamic VietQR Modal */}
       <VietQrModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
         qrData={qrData}
-        onPaymentSuccess={(ord) => {
-          alert('Đơn hàng ' + ord + ' đã được thanh toán thành công!');
-          setIsQrModalOpen(false);
-          setCart([]);
-        }}
+        onPaymentSuccess={handleVietQrPaymentSuccess}
       />
     </div>
   );

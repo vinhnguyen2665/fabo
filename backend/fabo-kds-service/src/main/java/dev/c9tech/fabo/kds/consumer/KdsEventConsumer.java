@@ -18,6 +18,7 @@ public class KdsEventConsumer {
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final dev.c9tech.fabo.kds.service.KdsService kdsService;
 
     public static final String KDS_OUT_OF_STOCK_TOPIC = "kds.item-out-of-stock";
 
@@ -26,6 +27,8 @@ public class KdsEventConsumer {
         String orderId = (String) payload.get("orderId");
         String branchId = (String) payload.get("branchId");
         log.info("KDS nhận order mới: {} cho chi nhánh {}", orderId, branchId);
+
+        kdsService.saveIncomingTicket(payload);
 
         // Broadcast order to kitchen display clients via WebSocket STOMP
         String destination = "/topic/branch/" + (branchId != null ? branchId : "default") + "/kitchen";

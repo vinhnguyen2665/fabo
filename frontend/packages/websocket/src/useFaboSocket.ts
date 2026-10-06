@@ -5,22 +5,24 @@ import SockJS from 'sockjs-client';
 export type SocketConnectionStatus = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
 
 export interface UseFaboSocketOptions {
-  brokerUrl?: string; // e.g. "ws://localhost:8080/ws-kds"
-  sockJsFallbackUrl?: string; // e.g. "http://localhost:8080/ws-kds"
+  brokerUrl?: string;
+  sockJsFallbackUrl?: string; // Default to relative '/ws-kds' so it leverages dev/prod proxy
   reconnectDelayMs?: number;
   heartbeatIncoming?: number;
   heartbeatOutgoing?: number;
   debug?: boolean;
+  enabled?: boolean; // Only connect when enabled (e.g. when modal is open)
 }
 
 export function useFaboSocket(options: UseFaboSocketOptions = {}) {
   const {
-    brokerUrl = 'ws://localhost:8080/ws-kds',
-    sockJsFallbackUrl = 'http://localhost:8080/ws-kds',
+    brokerUrl,
+    sockJsFallbackUrl = '/ws-kds',
     reconnectDelayMs = 5000,
     heartbeatIncoming = 10000,
     heartbeatOutgoing = 10000,
     debug = false,
+    enabled = true,
   } = options;
 
   const [status, setStatus] = useState<SocketConnectionStatus>('DISCONNECTED');
@@ -28,6 +30,15 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
   const subscriptionsRef = useRef<Map<string, StompSubscription>>(new Map());
 
   useEffect(() => {
+    if (!enabled) {
+      if (clientRef.current) {
+        clientRef.current.deactivate();
+        clientRef.current = null;
+      }
+      setStatus('DISCONNECTED');
+      return;
+    }
+
     setStatus('CONNECTING');
 
     const client = new Client({
@@ -39,11 +50,13 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
         if (debug) console.log('[STOMP DEBUG]', msg);
       },
       webSocketFactory: () => {
-        // Fallback to SockJS if brokerURL is an HTTP url or standard WS fails
         if (sockJsFallbackUrl) {
           return new SockJS(sockJsFallbackUrl);
         }
-        return new WebSocket(brokerUrl);
+        if (brokerUrl) {
+          return new WebSocket(brokerUrl);
+        }
+        return new SockJS('/ws-kds');
       },
       onConnect: () => {
         setStatus('CONNECTED');
@@ -55,11 +68,11 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
       },
       onStompError: (frame) => {
         setStatus('ERROR');
-        console.error('[STOMP ERROR]', frame.headers['message'], frame.body);
+        console.warn('[STOMP ERROR]', frame.headers['message'], frame.body);
       },
       onWebSocketError: (event) => {
         setStatus('ERROR');
-        console.error('[STOMP WS ERROR]', event);
+        console.warn('[STOMP WS ERROR]', event);
       },
     });
 
@@ -73,7 +86,7 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
       client.deactivate();
       setStatus('DISCONNECTED');
     };
-  }, [brokerUrl, sockJsFallbackUrl, reconnectDelayMs, heartbeatIncoming, heartbeatOutgoing, debug]);
+  }, [brokerUrl, sockJsFallbackUrl, reconnectDelayMs, heartbeatIncoming, heartbeatOutgoing, debug, enabled]);
 
   /**
    * Subscribe to a STOMP topic with type-safe JSON payload decoding.

@@ -21,7 +21,8 @@ export const VietQrModal: React.FC<VietQrModalProps> = ({
   const [isPaid, setIsPaid] = useState<boolean>(false);
 
   const { isConnected, subscribe } = useFaboSocket({
-    brokerUrl: 'ws://localhost:8080/ws-kds',
+    enabled: isOpen,
+    sockJsFallbackUrl: '/ws-kds',
   });
 
   // Countdown timer

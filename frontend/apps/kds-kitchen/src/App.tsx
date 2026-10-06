@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KdsTicketDto, KitchenStatus } from '@fabo/types';
 import { KdsKanbanBoard } from './components/KdsKanbanBoard';
 import { ItemAggregationView } from './components/ItemAggregationView';
-import { ChefHat, LayoutGrid, Layers, Volume2, Bell } from 'lucide-react';
+import { ChefHat, LayoutGrid, Layers, Volume2, RefreshCw } from 'lucide-react';
 
-const INITIAL_KDS_TICKETS: KdsTicketDto[] = [
+const FALLBACK_KDS_TICKETS: KdsTicketDto[] = [
   {
     orderId: 'ORD-1024',
     branchId: 'B01',
     tableId: 'T02',
     tableName: 'Bàn 02',
-    orderTime: new Date(Date.now() - 3 * 60 * 1000).toISOString(), // 3 phút trước
+    orderTime: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
     items: [
       { id: 'it-1', menuItemId: 'M01', itemName: 'Phở Bò Tái Nạm Đặc Biệt', quantity: 2, note: 'Ít bánh phở, nước trong', status: 'COOKING' },
       { id: 'it-2', menuItemId: 'M04', itemName: 'Cà Phê Muối Xứ Huế', quantity: 2, status: 'PENDING' },
@@ -21,27 +21,41 @@ const INITIAL_KDS_TICKETS: KdsTicketDto[] = [
     branchId: 'B01',
     tableId: 'T05',
     tableName: 'Sân Vườn 01',
-    orderTime: new Date(Date.now() - 8 * 60 * 1000).toISOString(), // 8 phút trước (Màu Vàng)
+    orderTime: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
     items: [
       { id: 'it-3', menuItemId: 'M01', itemName: 'Phở Bò Tái Nạm Đặc Biệt', quantity: 3, status: 'PENDING' },
       { id: 'it-4', menuItemId: 'M03', itemName: 'Cơm Rang Dưa Bò', quantity: 1, note: 'Không hành tây', status: 'COOKING' },
-    ],
-  },
-  {
-    orderId: 'ORD-1020',
-    branchId: 'B01',
-    tableId: 'T07',
-    tableName: 'VIP 01',
-    orderTime: new Date(Date.now() - 17 * 60 * 1000).toISOString(), // 17 phút trước (Màu Đỏ nhấp nháy!)
-    items: [
-      { id: 'it-5', menuItemId: 'M02', itemName: 'Bún Chả Hà Nội Cổ Truyền', quantity: 4, note: 'Nướng chả cháy cạnh', status: 'COOKING' },
     ],
   },
 ];
 
 export function App() {
   const [viewMode, setViewMode] = useState<'KANBAN' | 'AGGREGATE'>('KANBAN');
-  const [tickets, setTickets] = useState<KdsTicketDto[]>(INITIAL_KDS_TICKETS);
+  const [tickets, setTickets] = useState<KdsTicketDto[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const fetchTickets = async () => {
+    try {
+      const res = await fetch('/api/v1/kds/tickets');
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.body ?? []);
+        setTickets(list);
+      } else {
+        if (tickets.length === 0) setTickets(FALLBACK_KDS_TICKETS);
+      }
+    } catch (_) {
+      if (tickets.length === 0) setTickets(FALLBACK_KDS_TICKETS);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTickets();
+    const interval = setInterval(fetchTickets, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const playDingSound = () => {
     try {
@@ -50,7 +64,7 @@ export function App() {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
       gain.gain.setValueAtTime(0.4, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
       osc.start();
@@ -60,7 +74,7 @@ export function App() {
     }
   };
 
-  const handleUpdateItemStatus = (orderId: string, itemId: string, status: KitchenStatus) => {
+  const handleUpdateItemStatus = async (orderId: string, itemId: string, status: KitchenStatus) => {
     setTickets((prev) =>
       prev.map((t) => {
         if (t.orderId === orderId) {
@@ -72,11 +86,23 @@ export function App() {
         return t;
       })
     );
+
+    try {
+      await fetch(`/api/v1/kds/tickets/${orderId}/status?status=${status}`, {
+        method: 'PUT',
+      });
+    } catch (_) {}
   };
 
-  const handleCompleteOrder = (orderId: string) => {
+  const handleCompleteOrder = async (orderId: string) => {
     setTickets((prev) => prev.filter((t) => t.orderId !== orderId));
     playDingSound();
+
+    try {
+      await fetch(`/api/v1/kds/tickets/${orderId}/status?status=COMPLETED`, {
+        method: 'PUT',
+      });
+    } catch (_) {}
   };
 
   const handleReportOutOfStock = (itemId: string, itemName: string) => {
@@ -107,7 +133,7 @@ export function App() {
           </div>
           <div>
             <h1 className="font-extrabold text-sm tracking-tight text-white flex items-center gap-2">
-              FABO KDS KITCHEN DISPLAY <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono">BẾP NÓNG</span>
+              FABO KDS KITCHEN DISPLAY <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono">BẾP NÓNG (LIVE)</span>
             </h1>
           </div>
         </div>
@@ -135,6 +161,13 @@ export function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={fetchTickets}
+            title="Làm mới phiếu bếp"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={playDingSound}
             className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold"

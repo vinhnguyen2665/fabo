@@ -5,18 +5,38 @@ spring:
   cloud:
     gateway:
       routes:
+        - id: auth-service-route
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: hrm-service-route
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/v1/hrm/**
         - id: pos-service-route
           uri: http://localhost:8082
           predicates:
             - Path=/api/v1/pos/**
-        - id: payment-service-route
-          uri: http://localhost:8084
-          predicates:
-            - Path=/api/v1/payments/**
         - id: kds-service-route
           uri: http://localhost:8083
           predicates:
             - Path=/api/v1/kds/**
+        - id: payment-service-route
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/v1/payments/**
+        - id: inventory-service-route
+          uri: http://localhost:8085
+          predicates:
+            - Path=/api/v1/inventory/**
+        - id: finance-service-route
+          uri: http://localhost:8086
+          predicates:
+            - Path=/api/v1/finance/**
+        - id: kds-websocket-route
+          uri: ws://localhost:8083
+          predicates:
+            - Path=/ws-kds/**
 
 logging:
   level:

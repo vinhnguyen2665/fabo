@@ -1,0 +1,24 @@
+spring:
+  config:
+    activate:
+      on-profile: prod, product
+  cloud:
+    gateway:
+      routes:
+        - id: pos-service-route
+          uri: http://${POS_SERVICE_HOST:fabo-pos-service}:8082
+          predicates:
+            - Path=/api/v1/pos/**
+        - id: payment-service-route
+          uri: http://${PAYMENT_SERVICE_HOST:fabo-payment-service}:8084
+          predicates:
+            - Path=/api/v1/payments/**
+        - id: kds-service-route
+          uri: http://${KDS_SERVICE_HOST:fabo-kds-service}:8083
+          predicates:
+            - Path=/api/v1/kds/**
+
+logging:
+  level:
+    root: WARN
+    org.springframework.cloud.gateway: INFO

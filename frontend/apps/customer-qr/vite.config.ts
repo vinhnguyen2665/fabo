@@ -3,7 +3,21 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    global: 'globalThis',
+  },
   server: {
     port: 3003,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/ws-kds': {
+        target: 'http://localhost:8083',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
   },
 });

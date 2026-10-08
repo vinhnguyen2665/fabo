@@ -1,7 +1,7 @@
 package dev.c9tech.fabo.inventory.controller;
 
+import dev.c9tech.fabo.inventory.dto.IngredientDto;
 import dev.c9tech.fabo.inventory.dto.ResponseAPI;
-import dev.c9tech.fabo.inventory.entity.Ingredient;
 import dev.c9tech.fabo.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,11 +20,11 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping("/stock")
-    public ResponseAPI<List<Ingredient>> getStock(
+    public ResponseAPI<List<IngredientDto>> getStock(
             @RequestParam(defaultValue = "B01") String branchId
     ) {
-        List<Ingredient> stock = inventoryService.getStock(branchId);
-        ResponseAPI<List<Ingredient>> response = ResponseAPI.success(stock);
+        List<IngredientDto> stock = inventoryService.getStock(branchId);
+        ResponseAPI<List<IngredientDto>> response = ResponseAPI.success(stock);
         response.setRecordsTotal((long) stock.size());
         return response;
     }

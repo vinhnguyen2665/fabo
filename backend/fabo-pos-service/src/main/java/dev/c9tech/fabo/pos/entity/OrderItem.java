@@ -1,5 +1,6 @@
 package dev.c9tech.fabo.pos.entity;
 
+import dev.c9tech.fabo.pos.enums.KitchenStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -47,11 +48,4 @@ public class OrderItem {
 
     @Enumerated(EnumType.STRING)
     private KitchenStatus kitchenStatus;
-
-    public enum KitchenStatus {
-        PENDING,
-        COOKING,
-        COMPLETED,
-        CANCELLED
-    }
 }

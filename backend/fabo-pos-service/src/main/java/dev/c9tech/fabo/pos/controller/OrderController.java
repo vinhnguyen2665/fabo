@@ -1,7 +1,6 @@
 package dev.c9tech.fabo.pos.controller;
 
 import dev.c9tech.fabo.pos.dto.*;
-import dev.c9tech.fabo.pos.entity.DiningTable;
 import dev.c9tech.fabo.pos.service.DiningTableService;
 import dev.c9tech.fabo.pos.service.PosMenuService;
 import dev.c9tech.fabo.pos.service.PosOrderService;
@@ -29,18 +28,18 @@ public class OrderController {
     // -------------------------------------------------------------------------
 
     @GetMapping("/tables")
-    public ResponseAPI<List<DiningTable>> getTables(
+    public ResponseAPI<List<DiningTableDto>> getTables(
             @RequestParam(defaultValue = "B01") String branchId
     ) {
-        List<DiningTable> tables = tableService.getTables(branchId);
-        ResponseAPI<List<DiningTable>> response = ResponseAPI.success(tables);
+        List<DiningTableDto> tables = tableService.getTables(branchId);
+        ResponseAPI<List<DiningTableDto>> response = ResponseAPI.success(tables);
         response.setRecordsTotal((long) tables.size());
         return response;
     }
 
     @PostMapping("/tables")
-    public ResponseAPI<DiningTable> createTable(@RequestBody CreateTableDto dto) {
-        DiningTable saved = tableService.createTable(dto);
+    public ResponseAPI<DiningTableDto> createTable(@RequestBody CreateTableDto dto) {
+        DiningTableDto saved = tableService.createTable(dto);
         return ResponseAPI.success("Đã tạo bàn mới thành công", saved);
     }
 
@@ -75,11 +74,11 @@ public class OrderController {
     // -------------------------------------------------------------------------
 
     @GetMapping("/menu")
-    public ResponseAPI<List<Map<String, Object>>> getMenu(
+    public ResponseAPI<List<MenuItemDto>> getMenu(
             @RequestParam(defaultValue = "B01") String branchId
     ) {
-        List<Map<String, Object>> menu = menuService.getFullMenu(branchId);
-        ResponseAPI<List<Map<String, Object>>> response = ResponseAPI.success(menu);
+        List<MenuItemDto> menu = menuService.getFullMenu(branchId);
+        ResponseAPI<List<MenuItemDto>> response = ResponseAPI.success(menu);
         response.setRecordsTotal((long) menu.size());
         return response;
     }

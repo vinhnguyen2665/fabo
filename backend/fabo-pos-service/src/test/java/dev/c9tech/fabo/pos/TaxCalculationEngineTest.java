@@ -1,6 +1,7 @@
 package dev.c9tech.fabo.pos;
 
 import dev.c9tech.fabo.pos.engine.TaxCalculationEngine;
+import dev.c9tech.fabo.pos.enums.TaxMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ public class TaxCalculationEngineTest {
 
         TaxCalculationEngine.TaxCalculationResult result = engine.calculate(
                 items,
-                TaxCalculationEngine.TaxMode.TAX_INCLUSIVE,
+                TaxMode.TAX_INCLUSIVE,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 false
@@ -60,7 +61,7 @@ public class TaxCalculationEngineTest {
 
         TaxCalculationEngine.TaxCalculationResult result = engine.calculate(
                 items,
-                TaxCalculationEngine.TaxMode.TAX_EXCLUSIVE,
+                TaxMode.TAX_EXCLUSIVE,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 false
@@ -95,7 +96,7 @@ public class TaxCalculationEngineTest {
         // Net Subtotal = 180,000 VND. Service charge = 5% (9,000 VND).
         TaxCalculationEngine.TaxCalculationResult result = engine.calculate(
                 items,
-                TaxCalculationEngine.TaxMode.TAX_EXCLUSIVE,
+                TaxMode.TAX_EXCLUSIVE,
                 new BigDecimal("20000"),
                 new BigDecimal("0.05"),
                 true // service charge taxable at 10%

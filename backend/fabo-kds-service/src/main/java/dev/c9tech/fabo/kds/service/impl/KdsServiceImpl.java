@@ -1,6 +1,8 @@
 package dev.c9tech.fabo.kds.service.impl;
 
 import dev.c9tech.fabo.kds.dao.KdsTicketDAO;
+import dev.c9tech.fabo.kds.dto.KdsTicketDto;
+import dev.c9tech.fabo.kds.mapper.KdsTicketMapper;
 import dev.c9tech.fabo.kds.service.KdsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +19,10 @@ public class KdsServiceImpl implements KdsService {
     private final KdsTicketDAO kdsTicketDAO;
 
     @Override
-    public List<Map<String, Object>> getTickets(String branchId) {
+    public List<KdsTicketDto> getTickets(String branchId) {
         log.info("Lấy danh sách vé bếp chi nhánh: {}", branchId);
-        return kdsTicketDAO.findTicketsByBranch(branchId);
+        List<Map<String, Object>> tickets = kdsTicketDAO.findTicketsByBranch(branchId);
+        return KdsTicketMapper.fromMapList(tickets);
     }
 
     @Override

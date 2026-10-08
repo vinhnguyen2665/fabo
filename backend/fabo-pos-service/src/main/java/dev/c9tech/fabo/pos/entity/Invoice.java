@@ -1,5 +1,6 @@
 package dev.c9tech.fabo.pos.entity;
 
+import dev.c9tech.fabo.pos.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -64,11 +65,4 @@ public class Invoice {
 
     private LocalDateTime createdAt;
     private LocalDateTime paidAt;
-
-    public enum PaymentStatus {
-        PENDING,
-        PAID,
-        CANCELLED,
-        REFUNDED
-    }
 }

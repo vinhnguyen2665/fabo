@@ -1,7 +1,9 @@
 package dev.c9tech.fabo.inventory.service.impl;
 
 import dev.c9tech.fabo.inventory.dao.IngredientDAO;
+import dev.c9tech.fabo.inventory.dto.IngredientDto;
 import dev.c9tech.fabo.inventory.entity.Ingredient;
+import dev.c9tech.fabo.inventory.mapper.IngredientMapper;
 import dev.c9tech.fabo.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,9 +22,10 @@ public class InventoryServiceImpl implements InventoryService {
     private final IngredientDAO ingredientDAO;
 
     @Override
-    public List<Ingredient> getStock(String branchId) {
+    public List<IngredientDto> getStock(String branchId) {
         log.info("Lấy danh sách tồn kho cho chi nhánh {}", branchId);
-        return ingredientDAO.findByBranchId(branchId);
+        List<Ingredient> ingredients = ingredientDAO.findByBranchId(branchId);
+        return IngredientMapper.toDtoList(ingredients);
     }
 
     @Override
@@ -42,7 +45,7 @@ public class InventoryServiceImpl implements InventoryService {
                         "menuItemName", "Cà Phê Muối Xứ Huế",
                         "items", List.of(
                                 Map.of("ingredientName", "Cà Phê Hạt Robusta Rang Mộc", "quantity", 0.025, "unit", "kg"),
-                                Map.of("ingredientName", "Sữa Đặc Ngôi Sao Phương Nam", "quantity", 0.08, "unit", "lon")
+                                Map.of("ingredientName", "Sữa Đặc Ngôi Sau Phương Nam", "quantity", 0.08, "unit", "lon")
                         )
                 )
         );

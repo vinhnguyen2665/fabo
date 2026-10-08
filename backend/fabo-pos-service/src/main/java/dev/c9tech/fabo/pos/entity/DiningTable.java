@@ -1,5 +1,6 @@
 package dev.c9tech.fabo.pos.entity;
 
+import dev.c9tech.fabo.pos.enums.TableStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -60,11 +61,4 @@ public class DiningTable {
 
     @Builder.Default
     private Integer rotation = 0;
-
-    public enum TableStatus {
-        EMPTY,       // Bàn trống
-        OCCUPIED,    // Đang có khách
-        RESERVED,    // Đặt trước
-        CLEANING     // Chờ dọn dẹp
-    }
 }

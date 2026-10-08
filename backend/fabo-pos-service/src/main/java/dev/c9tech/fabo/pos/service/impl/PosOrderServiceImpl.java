@@ -3,6 +3,8 @@ package dev.c9tech.fabo.pos.service.impl;
 import dev.c9tech.fabo.pos.dto.*;
 import dev.c9tech.fabo.pos.engine.TaxCalculationEngine;
 import dev.c9tech.fabo.pos.entity.*;
+import dev.c9tech.fabo.pos.enums.*;
+import dev.c9tech.fabo.pos.mapper.DiningTableMapper;
 import dev.c9tech.fabo.pos.repository.*;
 import dev.c9tech.fabo.pos.service.PosOrderService;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +34,7 @@ public class PosOrderServiceImpl implements PosOrderService {
     public Map<String, Object> getTableActiveOrder(String tableId) {
         DiningTable table = tableRepository.findById(tableId).orElse(null);
         if (table == null || table.getActiveOrderId() == null) {
-            return Map.of("items", Collections.emptyList(), "table", table != null ? table : Collections.emptyMap());
+            return Map.of("items", Collections.emptyList(), "table", table != null ? DiningTableMapper.toDto(table) : Collections.emptyMap());
         }
 
         List<OrderItem> items = orderItemRepository.findByOrderId(table.getActiveOrderId());
@@ -52,7 +54,7 @@ public class PosOrderServiceImpl implements PosOrderService {
 
         return Map.of(
                 "orderId", table.getActiveOrderId(),
-                "table", table,
+                "table", DiningTableMapper.toDto(table),
                 "items", cartItems
         );
     }
@@ -65,7 +67,7 @@ public class PosOrderServiceImpl implements PosOrderService {
 
         DiningTable table = tableRepository.findById(dto.getTableId()).orElse(null);
         if (table != null) {
-            table.setStatus(DiningTable.TableStatus.OCCUPIED);
+            table.setStatus(TableStatus.OCCUPIED);
             table.setActiveOrderId(orderId);
             table.setLastStatusChange(LocalDateTime.now());
             tableRepository.save(table);
@@ -90,15 +92,15 @@ public class PosOrderServiceImpl implements PosOrderService {
                         .lineTotal(lineTotal)
                         .modifiersJson(itemDto.getModifiersJson())
                         .note(itemDto.getNote())
-                        .kitchenStatus(OrderItem.KitchenStatus.PENDING)
+                        .kitchenStatus(KitchenStatus.PENDING)
                         .build();
                 savedItems.add(orderItemRepository.save(entity));
             }
         }
 
-        TaxCalculationEngine.TaxMode taxMode = dto.isTaxInclusive()
-                ? TaxCalculationEngine.TaxMode.TAX_INCLUSIVE
-                : TaxCalculationEngine.TaxMode.TAX_EXCLUSIVE;
+        TaxMode taxMode = dto.isTaxInclusive()
+                ? TaxMode.TAX_INCLUSIVE
+                : TaxMode.TAX_EXCLUSIVE;
 
         List<TaxCalculationEngine.TaxItemInput> taxInputs = new ArrayList<>();
         if (dto.getItems() != null) {
@@ -134,7 +136,7 @@ public class PosOrderServiceImpl implements PosOrderService {
                 .serviceChargeAmount(calc.getServiceChargeAmount())
                 .totalTax(calc.getTotalTax())
                 .finalAmount(calc.getFinalAmount())
-                .paymentStatus(Invoice.PaymentStatus.PENDING)
+                .paymentStatus(PaymentStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .build();
         invoiceRepository.save(invoice);
@@ -167,7 +169,7 @@ public class PosOrderServiceImpl implements PosOrderService {
         log.info("Thanh toán cho đơn hàng: {}", orderId);
         Invoice invoice = invoiceRepository.findByOrderId(orderId).orElse(null);
         if (invoice != null) {
-            invoice.setPaymentStatus(Invoice.PaymentStatus.PAID);
+            invoice.setPaymentStatus(PaymentStatus.PAID);
             invoice.setPaymentMethod(dto.getPaymentMethod());
             invoice.setPaidAt(LocalDateTime.now());
             if (dto.getCashierId() != null) {
@@ -184,7 +186,7 @@ public class PosOrderServiceImpl implements PosOrderService {
         }
 
         tableRepository.findByActiveOrderId(orderId).ifPresent(tbl -> {
-            tbl.setStatus(DiningTable.TableStatus.CLEANING);
+            tbl.setStatus(TableStatus.CLEANING);
             tbl.setActiveOrderId(null);
             tbl.setLastStatusChange(LocalDateTime.now());
             tableRepository.save(tbl);

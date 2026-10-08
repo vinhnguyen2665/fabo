@@ -1,7 +1,7 @@
 package dev.c9tech.fabo.finance.dao;
 
-import java.util.Map;
+import dev.c9tech.fabo.finance.dto.AnalyticsSummaryDto;
 
 public interface FinanceDAO {
-    Map<String, Object> getAnalyticsSummary(String branchId);
+    AnalyticsSummaryDto getAnalyticsSummary(String branchId);
 }

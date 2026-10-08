@@ -1,11 +1,12 @@
 package dev.c9tech.fabo.hrm.service;
 
+import dev.c9tech.fabo.hrm.dto.LoginResponseDto;
 import dev.c9tech.fabo.hrm.dto.PinLoginRequest;
+import dev.c9tech.fabo.hrm.dto.StaffDto;
 
 import java.util.List;
-import java.util.Map;
 
 public interface StaffAuthService {
-    List<Map<String, Object>> getStaffList(String branchId);
-    Map<String, Object> pinLogin(PinLoginRequest request);
+    List<StaffDto> getStaffList(String branchId);
+    LoginResponseDto pinLogin(PinLoginRequest request);
 }

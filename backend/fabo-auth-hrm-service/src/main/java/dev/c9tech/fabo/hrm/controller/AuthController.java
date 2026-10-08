@@ -1,7 +1,9 @@
 package dev.c9tech.fabo.hrm.controller;
 
+import dev.c9tech.fabo.hrm.dto.LoginResponseDto;
 import dev.c9tech.fabo.hrm.dto.PinLoginRequest;
 import dev.c9tech.fabo.hrm.dto.ResponseAPI;
+import dev.c9tech.fabo.hrm.dto.StaffDto;
 import dev.c9tech.fabo.hrm.service.StaffAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @RestController
@@ -21,19 +22,19 @@ public class AuthController {
     private final StaffAuthService staffAuthService;
 
     @GetMapping("/staff-list")
-    public ResponseAPI<List<Map<String, Object>>> getStaffList(
+    public ResponseAPI<List<StaffDto>> getStaffList(
             @RequestParam(defaultValue = "B01") String branchId
     ) {
-        List<Map<String, Object>> staffList = staffAuthService.getStaffList(branchId);
-        ResponseAPI<List<Map<String, Object>>> response = ResponseAPI.success(staffList);
+        List<StaffDto> staffList = staffAuthService.getStaffList(branchId);
+        ResponseAPI<List<StaffDto>> response = ResponseAPI.success(staffList);
         response.setRecordsTotal((long) staffList.size());
         return response;
     }
 
     @PostMapping("/pin-login")
-    public ResponseAPI<Map<String, Object>> pinLogin(@RequestBody PinLoginRequest request) {
+    public ResponseAPI<LoginResponseDto> pinLogin(@RequestBody PinLoginRequest request) {
         try {
-            Map<String, Object> result = staffAuthService.pinLogin(request);
+            LoginResponseDto result = staffAuthService.pinLogin(request);
             return ResponseAPI.success("Đăng nhập thành công", result);
         } catch (IllegalArgumentException e) {
             log.warn("Đăng nhập thất bại: {}", e.getMessage());

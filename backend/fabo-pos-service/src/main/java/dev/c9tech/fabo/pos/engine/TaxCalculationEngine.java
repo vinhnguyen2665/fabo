@@ -1,5 +1,6 @@
 package dev.c9tech.fabo.pos.engine;
 
+import dev.c9tech.fabo.pos.enums.TaxMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,11 +17,6 @@ import java.util.*;
  */
 @Component
 public class TaxCalculationEngine {
-
-    public enum TaxMode {
-        TAX_INCLUSIVE,  // Giá niêm yết đã bao gồm thuế GTGT
-        TAX_EXCLUSIVE   // Giá niêm yết chưa bao gồm thuế GTGT
-    }
 
     @Data
     @Builder

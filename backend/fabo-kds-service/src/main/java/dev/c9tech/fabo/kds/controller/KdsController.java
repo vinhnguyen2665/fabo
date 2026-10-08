@@ -1,5 +1,6 @@
 package dev.c9tech.fabo.kds.controller;
 
+import dev.c9tech.fabo.kds.dto.KdsTicketDto;
 import dev.c9tech.fabo.kds.dto.ResponseAPI;
 import dev.c9tech.fabo.kds.service.KdsService;
 import lombok.RequiredArgsConstructor;
@@ -19,11 +20,11 @@ public class KdsController {
     private final KdsService kdsService;
 
     @GetMapping("/tickets")
-    public ResponseAPI<List<Map<String, Object>>> getTickets(
+    public ResponseAPI<List<KdsTicketDto>> getTickets(
             @RequestParam(defaultValue = "B01") String branchId
     ) {
-        List<Map<String, Object>> tickets = kdsService.getTickets(branchId);
-        ResponseAPI<List<Map<String, Object>>> response = ResponseAPI.success(tickets);
+        List<KdsTicketDto> tickets = kdsService.getTickets(branchId);
+        ResponseAPI<List<KdsTicketDto>> response = ResponseAPI.success(tickets);
         response.setRecordsTotal((long) tickets.size());
         return response;
     }

@@ -9,6 +9,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class CreateOrderDto {
+    private String orderId;
     private String branchId;
     private String tableId;
     private String tableName;

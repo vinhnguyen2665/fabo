@@ -6,17 +6,26 @@ export type SocketConnectionStatus = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'
 
 export interface UseFaboSocketOptions {
   brokerUrl?: string;
-  sockJsFallbackUrl?: string; // Default to relative '/ws-kds' so it leverages dev/prod proxy
+  useSockJs?: boolean;
+  sockJsFallbackUrl?: string;
   reconnectDelayMs?: number;
   heartbeatIncoming?: number;
   heartbeatOutgoing?: number;
   debug?: boolean;
-  enabled?: boolean; // Only connect when enabled (e.g. when modal is open)
+  enabled?: boolean; // Only connect when enabled
+}
+
+interface PendingSubscription {
+  id: string;
+  destination: string;
+  callback: (data: any, rawMessage: IMessage) => void;
+  stompSub: StompSubscription | null;
 }
 
 export function useFaboSocket(options: UseFaboSocketOptions = {}) {
   const {
     brokerUrl,
+    useSockJs = false,
     sockJsFallbackUrl = '/ws-kds',
     reconnectDelayMs = 5000,
     heartbeatIncoming = 10000,
@@ -27,7 +36,31 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
 
   const [status, setStatus] = useState<SocketConnectionStatus>('DISCONNECTED');
   const clientRef = useRef<Client | null>(null);
-  const subscriptionsRef = useRef<Map<string, StompSubscription>>(new Map());
+  const subsMapRef = useRef<Map<string, PendingSubscription>>(new Map());
+
+  // Helper to activate a pending subscription on the client
+  const activateSub = (sub: PendingSubscription) => {
+    const client = clientRef.current;
+    if (!client || !client.connected) return;
+
+    try {
+      if (sub.stompSub) {
+        try {
+          sub.stompSub.unsubscribe();
+        } catch (_) {}
+      }
+      sub.stompSub = client.subscribe(sub.destination, (message: IMessage) => {
+        try {
+          const parsed = JSON.parse(message.body);
+          sub.callback(parsed, message);
+        } catch {
+          sub.callback(message.body, message);
+        }
+      });
+    } catch (err) {
+      console.warn('[STOMP] Subscribe error:', err);
+    }
+  };
 
   useEffect(() => {
     if (!enabled) {
@@ -41,30 +74,38 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
 
     setStatus('CONNECTING');
 
+    const defaultNativeWsUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws-kds`
+        : undefined;
+
     const client = new Client({
-      brokerURL: brokerUrl,
+      brokerURL: useSockJs ? undefined : (brokerUrl || defaultNativeWsUrl),
       reconnectDelay: reconnectDelayMs,
       heartbeatIncoming,
       heartbeatOutgoing,
       debug: (msg: string) => {
         if (debug) console.log('[STOMP DEBUG]', msg);
       },
-      webSocketFactory: () => {
-        if (sockJsFallbackUrl) {
-          return new SockJS(sockJsFallbackUrl);
-        }
-        if (brokerUrl) {
-          return new WebSocket(brokerUrl);
-        }
-        return new SockJS('/ws-kds');
-      },
+      ...(useSockJs
+        ? {
+            webSocketFactory: () => new SockJS(sockJsFallbackUrl),
+          }
+        : {}),
       onConnect: () => {
         setStatus('CONNECTED');
         if (debug) console.log('[STOMP] Kết nối thành công!');
+        // Re-activate all registered subscriptions
+        subsMapRef.current.forEach((sub) => {
+          activateSub(sub);
+        });
       },
       onDisconnect: () => {
         setStatus('DISCONNECTED');
         if (debug) console.log('[STOMP] Đã ngắt kết nối!');
+        subsMapRef.current.forEach((sub) => {
+          sub.stompSub = null;
+        });
       },
       onStompError: (frame) => {
         setStatus('ERROR');
@@ -80,9 +121,14 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
     clientRef.current = client;
 
     return () => {
-      // Cleanup subscriptions
-      subscriptionsRef.current.forEach((sub) => sub.unsubscribe());
-      subscriptionsRef.current.clear();
+      subsMapRef.current.forEach((sub) => {
+        if (sub.stompSub) {
+          try {
+            sub.stompSub.unsubscribe();
+          } catch (_) {}
+          sub.stompSub = null;
+        }
+      });
       client.deactivate();
       setStatus('DISCONNECTED');
     };
@@ -90,30 +136,33 @@ export function useFaboSocket(options: UseFaboSocketOptions = {}) {
 
   /**
    * Subscribe to a STOMP topic with type-safe JSON payload decoding.
+   * Safe to call before connection is established: will auto-subscribe on connect.
    */
   const subscribe = useCallback(
     <T>(destination: string, callback: (data: T, rawMessage: IMessage) => void) => {
-      const client = clientRef.current;
-      if (!client) {
-        console.warn('[STOMP] Client chưa sẵn sàng để subscribe:', destination);
-        return () => {};
+      const subId = destination + '_' + Math.random().toString(36).substring(2, 9);
+      const subObj: PendingSubscription = {
+        id: subId,
+        destination,
+        callback: callback as (data: any, rawMessage: IMessage) => void,
+        stompSub: null,
+      };
+
+      subsMapRef.current.set(subId, subObj);
+
+      // If already connected, activate immediately
+      if (clientRef.current && clientRef.current.connected) {
+        activateSub(subObj);
       }
 
-      const subscription = client.subscribe(destination, (message: IMessage) => {
-        try {
-          const parsed: T = JSON.parse(message.body);
-          callback(parsed, message);
-        } catch (e) {
-          console.warn('[STOMP] Không thể parse JSON từ message:', message.body);
-          callback(message.body as unknown as T, message);
-        }
-      });
-
-      subscriptionsRef.current.set(destination, subscription);
-
       return () => {
-        subscription.unsubscribe();
-        subscriptionsRef.current.delete(destination);
+        const existing = subsMapRef.current.get(subId);
+        if (existing && existing.stompSub) {
+          try {
+            existing.stompSub.unsubscribe();
+          } catch (_) {}
+        }
+        subsMapRef.current.delete(subId);
       };
     },
     []

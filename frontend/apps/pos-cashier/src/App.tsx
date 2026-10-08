@@ -11,9 +11,10 @@ import { VietQrModal } from './components/VietQrModal';
 import { CashierLoginModal } from './components/CashierLoginModal';
 import { ShiftCloseModal } from './components/ShiftCloseModal';
 import { ReceiptModal } from './components/ReceiptModal';
+import { useFaboSocket } from '@fabo/websocket';
 import { 
   LayoutGrid, UtensilsCrossed, Receipt, Shield, 
-  Lock, LogOut, Calculator, RefreshCw, Send 
+  Lock, LogOut, Calculator, RefreshCw, Send, Bell, Loader2 
 } from 'lucide-react';
 
 export function App() {
@@ -42,6 +43,34 @@ export function App() {
   const [receiptPreCheck, setReceiptPreCheck] = useState<boolean>(false);
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState<'CASH' | 'VIETQR'>('CASH');
   const [currentEInvoiceInfo, setCurrentEInvoiceInfo] = useState<{ taxCode: string; companyName: string; email: string } | undefined>();
+  const [kitchenAlert, setKitchenAlert] = useState<string | null>(null);
+  const [isSendingToKitchen, setIsSendingToKitchen] = useState<boolean>(false);
+
+  const { subscribe } = useFaboSocket({
+    enabled: true,
+  });
+
+  useEffect(() => {
+    const unsub = subscribe<any>('/topic/branch/B01/waiter', (data) => {
+      if (data && (data.type === 'CALL_WAITER' || data.event === 'ORDER_READY_FOR_PICKUP')) {
+        setKitchenAlert(data.message || `Món ăn cho ${data.tableName} đã sẵn sàng! Mời phục vụ bưng món.`);
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.8);
+        } catch (_) {}
+      }
+    });
+
+    return () => unsub();
+  }, [subscribe]);
 
   // Fetch Tables & Menu from Backend Microservices
   const fetchTables = async () => {
@@ -153,6 +182,8 @@ export function App() {
 
   // Send Order to Kitchen (KDS) & Save active order
   const handleSendOrderToKitchen = async () => {
+    if (isSendingToKitchen) return;
+
     if (!selectedTable) {
       alert('Vui lòng chọn bàn trước khi gửi bếp!');
       return;
@@ -162,13 +193,35 @@ export function App() {
       return;
     }
 
+    setIsSendingToKitchen(true);
+
     try {
       const orderPayload = {
+        orderId: selectedTable.activeOrderId || undefined,
         tableId: selectedTable.id,
         tableName: selectedTable.tableName,
         branchId: selectedTable.branchId || 'B01',
         staffId: session?.staff.id || 'usr-01',
-        items: cart,
+        items: cart.map((it) => {
+          const modText =
+            it.selectedModifiers && it.selectedModifiers.length > 0
+              ? it.selectedModifiers
+                  .map((m: any) => m.name + (m.price || m.extraPrice ? ` (+${(m.price || m.extraPrice).toLocaleString()}₫)` : ''))
+                  .join(', ')
+              : (it.modifiersText || '');
+          return {
+            id: it.id && it.id.startsWith('ITEM-') ? it.id : undefined,
+            menuItemId: it.menuItemId,
+            itemName: it.itemName,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            taxRate: it.taxRate,
+            note: it.note || '',
+            modifiersText: modText,
+            modifiersJson: modText,
+            selectedModifiers: it.selectedModifiers || [],
+          };
+        }),
         totalAmount: finalAmount,
       };
 
@@ -181,21 +234,44 @@ export function App() {
       if (res.ok) {
         const raw = await res.json();
         const savedOrder = raw.body ?? raw;
-        alert(`Đã gửi đơn #${savedOrder.id || savedOrder.orderId || 'ORD-KDS'} xuống bếp KDS thành công!`);
-        await fetchTables();
-      } else {
-        alert('Đã gửi thông tin đơn sang KDS thành công!');
-        // Update table locally to OCCUPIED
+        const assignedOrderId = savedOrder.id || savedOrder.orderId || selectedTable.activeOrderId;
+
+        setSelectedTable((prev) =>
+          prev ? { ...prev, status: 'OCCUPIED', activeOrderId: assignedOrderId } : null
+        );
         setTables((prev) =>
           prev.map((t) =>
             t.id === selectedTable.id
-              ? { ...t, status: 'OCCUPIED', activeOrderId: 'ORD-' + Date.now().toString().slice(-4) }
+              ? { ...t, status: 'OCCUPIED', activeOrderId: assignedOrderId }
               : t
           )
         );
+
+        if (savedOrder.items && Array.isArray(savedOrder.items)) {
+          setCart(
+            savedOrder.items.map((it: any) => ({
+              id: it.id,
+              menuItemId: it.menuItemId,
+              itemName: it.itemName,
+              unitPrice: it.unitPrice,
+              quantity: it.quantity,
+              taxRate: it.taxRate,
+              selectedModifiers: [],
+              modifiersText: it.modifiersJson,
+              note: it.note,
+            }))
+          );
+        }
+
+        await fetchTables();
+        alert(`Đã gửi đơn #${assignedOrderId} xuống bếp KDS thành công!`);
+      } else {
+        alert('Gửi đơn sang KDS thất bại. Vui lòng kiểm tra lại kết nối!');
       }
     } catch (err) {
-      alert('Đã gửi đơn xuống bếp KDS!');
+      alert('Có lỗi xảy ra khi gửi đơn sang KDS!');
+    } finally {
+      setIsSendingToKitchen(false);
     }
   };
 
@@ -550,11 +626,20 @@ export function App() {
                 </span>
                 <button
                   onClick={handleSendOrderToKitchen}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 || isSendingToKitchen}
                   className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Báo Bếp KDS</span>
+                  {isSendingToKitchen ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang gửi bếp...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Báo Bếp KDS</span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -639,6 +724,24 @@ export function App() {
         qrData={qrData}
         onPaymentSuccess={handleVietQrPaymentSuccess}
       />
+
+      {/* Floating Kitchen Ready Alert Banner */}
+      {kitchenAlert && (
+        <div className="fixed top-5 right-5 z-50 bg-emerald-500 text-slate-950 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce border-2 border-emerald-400">
+          <Bell className="w-5 h-5 animate-spin" />
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-wider text-emerald-950">Bếp gọi bưng món</div>
+            <div className="font-bold text-sm leading-tight">{kitchenAlert}</div>
+          </div>
+          <button
+            onClick={() => setKitchenAlert(null)}
+            className="ml-3 bg-slate-950/20 hover:bg-slate-950/40 rounded-lg p-1.5 text-xs font-bold transition"
+            title="Đóng thông báo"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }

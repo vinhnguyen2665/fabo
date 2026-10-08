@@ -88,7 +88,32 @@ export function App() {
     );
 
     try {
-      await fetch(`/api/v1/kds/tickets/${orderId}/status?status=${status}`, {
+      await fetch(`/api/v1/kds/tickets/${orderId}/status?status=${status}&itemId=${encodeURIComponent(itemId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, itemId }),
+      });
+    } catch (_) {}
+  };
+
+  const handleCompleteAllItems = async (orderId: string) => {
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.orderId === orderId
+          ? {
+              ...t,
+              status: 'COOKING',
+              items: t.items.map((it) => ({ ...it, status: 'COMPLETED' })),
+            }
+          : t
+      )
+    );
+    playDingSound();
+
+    try {
+      await fetch(`/api/v1/kds/tickets/${orderId}/complete-items`, {
         method: 'PUT',
       });
     } catch (_) {}
@@ -99,8 +124,8 @@ export function App() {
     playDingSound();
 
     try {
-      await fetch(`/api/v1/kds/tickets/${orderId}/status?status=COMPLETED`, {
-        method: 'PUT',
+      await fetch(`/api/v1/kds/tickets/${orderId}/call-waiter`, {
+        method: 'POST',
       });
     } catch (_) {}
   };
@@ -111,7 +136,7 @@ export function App() {
     }
   };
 
-  const handleBatchCompleteItem = (menuItemId: string) => {
+  const handleBatchCompleteItem = async (menuItemId: string) => {
     setTickets((prev) =>
       prev.map((t) => ({
         ...t,
@@ -121,6 +146,14 @@ export function App() {
       }))
     );
     playDingSound();
+
+    try {
+      await fetch(`/api/v1/kds/items/${encodeURIComponent(menuItemId)}/status?status=COMPLETED`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'COMPLETED' }),
+      });
+    } catch (_) {}
   };
 
   return (
@@ -188,6 +221,7 @@ export function App() {
             onUpdateStatus={handleUpdateItemStatus}
             onReportOutOfStock={handleReportOutOfStock}
             onCompleteOrder={handleCompleteOrder}
+            onCompleteAllItems={handleCompleteAllItems}
           />
         ) : (
           <ItemAggregationView

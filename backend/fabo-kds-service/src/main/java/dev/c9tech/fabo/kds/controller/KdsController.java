@@ -32,10 +32,62 @@ public class KdsController {
     @PutMapping("/tickets/{orderId}/status")
     public ResponseAPI<Map<String, Object>> updateTicketStatus(
             @PathVariable String orderId,
-            @RequestBody Map<String, String> body
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String itemId,
+            @RequestBody(required = false) Map<String, String> body
     ) {
-        String newStatus = body.getOrDefault("status", "COMPLETED");
-        Map<String, Object> result = kdsService.updateTicketStatus(orderId, newStatus);
+        String targetStatus = status;
+        String targetItemId = itemId;
+        if (body != null) {
+            if (targetStatus == null || targetStatus.isBlank()) {
+                targetStatus = body.get("status");
+            }
+            if (targetItemId == null || targetItemId.isBlank()) {
+                targetItemId = body.get("itemId");
+            }
+        }
+        if (targetStatus == null || targetStatus.isBlank()) {
+            throw new IllegalArgumentException("Trạng thái vé (status) không được để trống");
+        }
+
+        Map<String, Object> result = kdsService.updateTicketStatus(orderId, targetStatus, targetItemId);
         return ResponseAPI.success("Cập nhật trạng thái vé thành công", result);
+    }
+
+    @PutMapping("/items/{itemId}/status")
+    public ResponseAPI<Map<String, Object>> updateItemStatus(
+            @PathVariable String itemId,
+            @RequestParam(required = false) String status,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        String targetStatus = status;
+        if ((targetStatus == null || targetStatus.isBlank()) && body != null) {
+            targetStatus = body.get("status");
+        }
+        if (targetStatus == null || targetStatus.isBlank()) {
+            throw new IllegalArgumentException("Trạng thái món (status) không được để trống");
+        }
+
+        Map<String, Object> result = kdsService.updateItemStatus(itemId, targetStatus);
+        return ResponseAPI.success("Cập nhật trạng thái món thành công", result);
+    }
+
+    @PutMapping("/tickets/{orderId}/complete-items")
+    public ResponseAPI<Map<String, Object>> completeAllItems(@PathVariable String orderId) {
+        Map<String, Object> result = kdsService.completeAllItems(orderId);
+        return ResponseAPI.success("Đã hoàn thành toàn bộ món trên vé", result);
+    }
+
+    @PostMapping("/tickets/{orderId}/call-waiter")
+    public ResponseAPI<Map<String, Object>> callWaiter(@PathVariable String orderId) {
+        Map<String, Object> result = kdsService.callWaiter(orderId);
+        return ResponseAPI.success("Đã phát thông báo gọi phục vụ bưng món", result);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
+    public ResponseAPI<Void> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("Yêu cầu không hợp lệ: {}", ex.getMessage());
+        return ResponseAPI.error(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 }

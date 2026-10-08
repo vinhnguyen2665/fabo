@@ -8,6 +8,7 @@ export interface KdsKanbanBoardProps {
   onUpdateStatus: (orderId: string, itemId: string, status: KitchenStatus) => void;
   onReportOutOfStock: (itemId: string, itemName: string) => void;
   onCompleteOrder: (orderId: string) => void;
+  onCompleteAllItems: (orderId: string) => void;
 }
 
 export const KdsKanbanBoard: React.FC<KdsKanbanBoardProps> = ({
@@ -15,6 +16,7 @@ export const KdsKanbanBoard: React.FC<KdsKanbanBoardProps> = ({
   onUpdateStatus,
   onReportOutOfStock,
   onCompleteOrder,
+  onCompleteAllItems,
 }) => {
   return (
     <div className="flex-1 flex gap-4 p-4 overflow-x-auto bg-slate-950">
@@ -32,6 +34,7 @@ export const KdsKanbanBoard: React.FC<KdsKanbanBoardProps> = ({
               onUpdateStatus={onUpdateStatus}
               onReportOutOfStock={onReportOutOfStock}
               onCompleteOrder={onCompleteOrder}
+              onCompleteAllItems={onCompleteAllItems}
             />
           </div>
         ))

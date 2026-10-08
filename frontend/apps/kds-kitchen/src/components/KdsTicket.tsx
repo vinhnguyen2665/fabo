@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { KdsTicketDto, KitchenStatus } from '@fabo/types';
-import { Clock, CheckCircle, AlertTriangle, Flame, Ban } from 'lucide-react';
+import { Clock, CheckCircle, AlertTriangle, Flame, Ban, BellRing } from 'lucide-react';
 
 export interface KdsTicketProps {
   ticket: KdsTicketDto;
   onUpdateStatus?: (orderId: string, itemId: string, status: KitchenStatus) => void;
   onReportOutOfStock?: (itemId: string, itemName: string) => void;
   onCompleteOrder?: (orderId: string) => void;
+  onCompleteAllItems?: (orderId: string) => void;
 }
 
 export const KdsTicket: React.FC<KdsTicketProps> = ({
@@ -14,16 +15,22 @@ export const KdsTicket: React.FC<KdsTicketProps> = ({
   onUpdateStatus,
   onReportOutOfStock,
   onCompleteOrder,
+  onCompleteAllItems,
 }) => {
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => {
-    const start = new Date(ticket.orderTime).getTime();
-    return Math.max(0, Math.floor((Date.now() - start) / 1000));
-  });
+  const calculateElapsed = (orderTimeStr?: string): number => {
+    if (!orderTimeStr) return 0;
+    const start = new Date(orderTimeStr).getTime();
+    if (isNaN(start) || start <= 0) return 0;
+    const diff = Math.floor((Date.now() - start) / 1000);
+    return Math.max(0, diff);
+  };
+
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => calculateElapsed(ticket.orderTime));
 
   useEffect(() => {
+    setElapsedSeconds(calculateElapsed(ticket.orderTime));
     const timer = setInterval(() => {
-      const start = new Date(ticket.orderTime).getTime();
-      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      setElapsedSeconds(calculateElapsed(ticket.orderTime));
     }, 1000);
 
     return () => clearInterval(timer);
@@ -160,17 +167,23 @@ export const KdsTicket: React.FC<KdsTicketProps> = ({
 
       {/* Ticket Footer Action */}
       <div className="p-3 border-t border-white/10 bg-slate-950/60">
-        <button
-          onClick={() => onCompleteOrder && onCompleteOrder(ticket.orderId)}
-          className={`w-full py-2.5 rounded-xl font-bold text-sm tracking-wide transition active:scale-95 flex items-center justify-center gap-2 ${
-            allItemsCompleted
-              ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
-              : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-        >
-          <CheckCircle className="h-4 w-4" />
-          <span>{allItemsCompleted ? 'HOÀN THÀNH ĐƠN (GỌI BƯNG)' : 'XONG TOÀN BỘ MÓN'}</span>
-        </button>
+        {allItemsCompleted ? (
+          <button
+            onClick={() => onCompleteOrder && onCompleteOrder(ticket.orderId)}
+            className="w-full py-2.5 rounded-xl font-black text-sm tracking-wide transition active:scale-95 flex items-center justify-center gap-2 bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-lg shadow-emerald-500/30 animate-pulse"
+          >
+            <BellRing className="h-4 w-4" />
+            <span>🔔 GỌI BƯNG (HOÀN TẤT ĐƠN)</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onCompleteAllItems && onCompleteAllItems(ticket.orderId)}
+            className="w-full py-2.5 rounded-xl font-bold text-sm tracking-wide transition active:scale-95 flex items-center justify-center gap-2 bg-white/10 text-white hover:bg-white/20 hover:text-amber-300 border border-white/10"
+          >
+            <CheckCircle className="h-4 w-4" />
+            <span>XONG TOÀN BỘ MÓN</span>
+          </button>
+        )}
       </div>
     </div>
   );

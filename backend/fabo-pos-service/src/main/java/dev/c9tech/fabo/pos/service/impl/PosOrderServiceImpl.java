@@ -48,7 +48,10 @@ public class PosOrderServiceImpl implements PosOrderService {
             c.put("quantity", it.getQuantity());
             c.put("taxRate", it.getTaxRate());
             c.put("selectedModifiers", Collections.emptyList());
+            c.put("modifiersText", it.getModifiersJson());
+            c.put("modifiersJson", it.getModifiersJson());
             c.put("note", it.getNote());
+            c.put("status", it.getKitchenStatus() != null ? it.getKitchenStatus().name() : "PENDING");
             cartItems.add(c);
         }
 
@@ -62,10 +65,16 @@ public class PosOrderServiceImpl implements PosOrderService {
     @Override
     @Transactional
     public Map<String, Object> createOrder(CreateOrderDto dto) {
-        log.info("Tạo order mới cho bàn: {}", dto.getTableName());
-        String orderId = "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-
+        log.info("Xử lý đơn hàng cho bàn: {}", dto.getTableName());
         DiningTable table = tableRepository.findById(dto.getTableId()).orElse(null);
+
+        // 1. Resolve orderId: reuse activeOrderId of table or dto.orderId if present
+        String orderId = (dto.getOrderId() != null && !dto.getOrderId().isBlank())
+                ? dto.getOrderId()
+                : (table != null && table.getActiveOrderId() != null && !table.getActiveOrderId().isBlank()
+                        ? table.getActiveOrderId()
+                        : "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+
         if (table != null) {
             table.setStatus(TableStatus.OCCUPIED);
             table.setActiveOrderId(orderId);
@@ -73,28 +82,63 @@ public class PosOrderServiceImpl implements PosOrderService {
             tableRepository.save(table);
         }
 
+        // 2. Map existing items to preserve kitchen cooking status
+        List<OrderItem> existingDbItems = orderItemRepository.findByOrderId(orderId);
+        Map<String, OrderItem> existingById = new HashMap<>();
+        for (OrderItem it : existingDbItems) {
+            existingById.put(it.getId(), it);
+        }
+
         List<OrderItem> savedItems = new ArrayList<>();
+        Set<String> processedIds = new HashSet<>();
+
         if (dto.getItems() != null) {
             for (OrderItemDto itemDto : dto.getItems()) {
                 BigDecimal unitPrice = itemDto.getUnitPrice() != null ? itemDto.getUnitPrice() : BigDecimal.ZERO;
                 int qty = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
                 BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
 
-                OrderItem entity = OrderItem.builder()
-                        .id("ITEM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                        .orderId(orderId)
-                        .menuItemId(itemDto.getMenuItemId())
-                        .itemName(itemDto.getItemName())
-                        .quantity(qty)
-                        .unitPrice(unitPrice)
-                        .taxRate(itemDto.getTaxRate() != null ? itemDto.getTaxRate() : new BigDecimal("0.08"))
-                        .itemDiscount(BigDecimal.ZERO)
-                        .lineTotal(lineTotal)
-                        .modifiersJson(itemDto.getModifiersJson())
-                        .note(itemDto.getNote())
-                        .kitchenStatus(KitchenStatus.PENDING)
-                        .build();
-                savedItems.add(orderItemRepository.save(entity));
+                String modText = itemDto.getModifiersText();
+                if ((modText == null || modText.isBlank()) && itemDto.getModifiersJson() != null) {
+                    modText = itemDto.getModifiersJson();
+                }
+
+                OrderItem entity;
+                String itemId = itemDto.getId();
+                if (itemId != null && existingById.containsKey(itemId)) {
+                    entity = existingById.get(itemId);
+                    entity.setQuantity(qty);
+                    entity.setUnitPrice(unitPrice);
+                    entity.setLineTotal(lineTotal);
+                    entity.setNote(itemDto.getNote());
+                    entity.setModifiersJson(modText);
+                    // Retain existing kitchenStatus!
+                } else {
+                    entity = OrderItem.builder()
+                            .id("ITEM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                            .orderId(orderId)
+                            .menuItemId(itemDto.getMenuItemId())
+                            .itemName(itemDto.getItemName())
+                            .quantity(qty)
+                            .unitPrice(unitPrice)
+                            .taxRate(itemDto.getTaxRate() != null ? itemDto.getTaxRate() : new BigDecimal("0.08"))
+                            .itemDiscount(BigDecimal.ZERO)
+                            .lineTotal(lineTotal)
+                            .modifiersJson(modText)
+                            .note(itemDto.getNote())
+                            .kitchenStatus(KitchenStatus.PENDING)
+                            .build();
+                }
+                OrderItem saved = orderItemRepository.save(entity);
+                savedItems.add(saved);
+                processedIds.add(saved.getId());
+            }
+        }
+
+        // Remove deleted items if any
+        for (OrderItem oldIt : existingDbItems) {
+            if (!processedIds.contains(oldIt.getId())) {
+                orderItemRepository.delete(oldIt);
             }
         }
 
@@ -124,21 +168,24 @@ public class PosOrderServiceImpl implements PosOrderService {
                 true
         );
 
-        Invoice invoice = Invoice.builder()
-                .id("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                .orderId(orderId)
-                .branchId(dto.getBranchId() != null ? dto.getBranchId() : "B01")
-                .tableId(dto.getTableId())
-                .tableName(dto.getTableName())
-                .cashierId(dto.getCashierId() != null ? dto.getCashierId() : "usr-01")
-                .rawSubtotal(calc.getRawSubtotal())
-                .totalDiscount(calc.getTotalDiscount())
-                .serviceChargeAmount(calc.getServiceChargeAmount())
-                .totalTax(calc.getTotalTax())
-                .finalAmount(calc.getFinalAmount())
-                .paymentStatus(PaymentStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Invoice invoice = invoiceRepository.findByOrderId(orderId).orElse(null);
+        if (invoice == null) {
+            invoice = Invoice.builder()
+                    .id("INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                    .orderId(orderId)
+                    .branchId(dto.getBranchId() != null ? dto.getBranchId() : "B01")
+                    .tableId(dto.getTableId())
+                    .tableName(dto.getTableName())
+                    .cashierId(dto.getCashierId() != null ? dto.getCashierId() : "usr-01")
+                    .paymentStatus(PaymentStatus.PENDING)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+        }
+        invoice.setRawSubtotal(calc.getRawSubtotal());
+        invoice.setTotalDiscount(calc.getTotalDiscount());
+        invoice.setServiceChargeAmount(calc.getServiceChargeAmount());
+        invoice.setTotalTax(calc.getTotalTax());
+        invoice.setFinalAmount(calc.getFinalAmount());
         invoiceRepository.save(invoice);
 
         try {
@@ -146,9 +193,25 @@ public class PosOrderServiceImpl implements PosOrderService {
             kdsEvent.put("orderId", orderId);
             kdsEvent.put("tableId", dto.getTableId());
             kdsEvent.put("tableName", dto.getTableName());
-            kdsEvent.put("branchId", dto.getBranchId());
-            kdsEvent.put("items", savedItems);
+            kdsEvent.put("branchId", dto.getBranchId() != null ? dto.getBranchId() : "B01");
+            kdsEvent.put("orderTime", LocalDateTime.now().toString());
             kdsEvent.put("timestamp", LocalDateTime.now().toString());
+
+            List<Map<String, Object>> kdsItems = new ArrayList<>();
+            for (OrderItem it : savedItems) {
+                Map<String, Object> itMap = new HashMap<>();
+                itMap.put("id", it.getId());
+                itMap.put("menuItemId", it.getMenuItemId());
+                itMap.put("itemName", it.getItemName());
+                itMap.put("quantity", it.getQuantity());
+                itMap.put("note", it.getNote());
+                itMap.put("status", it.getKitchenStatus() != null ? it.getKitchenStatus().name() : "PENDING");
+                itMap.put("modifiersText", it.getModifiersJson());
+                itMap.put("modifiersJson", it.getModifiersJson());
+                kdsItems.add(itMap);
+            }
+            kdsEvent.put("items", kdsItems);
+
             kafkaTemplate.send(ORDER_CREATED_TOPIC, orderId, kdsEvent);
         } catch (Exception e) {
             log.warn("Kafka không sẵn sàng, bỏ qua event KDS: {}", e.getMessage());

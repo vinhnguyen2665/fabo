@@ -20,6 +20,38 @@ public class KdsTicketMapper {
             for (Object obj : (List<?>) rawItems) {
                 if (obj instanceof Map<?, ?>) {
                     Map<String, Object> itemMap = (Map<String, Object>) obj;
+                    String modText = (String) itemMap.get("modifiersText");
+                    if (modText == null || modText.isBlank()) {
+                        Object rawMod = itemMap.get("modifiersJson");
+                        if (rawMod instanceof String) {
+                            modText = (String) rawMod;
+                        }
+                    }
+                    if (modText == null || modText.isBlank()) {
+                        Object selMods = itemMap.get("selectedModifiers");
+                        if (selMods instanceof List<?>) {
+                            List<String> modNames = new ArrayList<>();
+                            for (Object m : (List<?>) selMods) {
+                                if (m instanceof Map<?, ?>) {
+                                    Object name = ((Map<?, ?>) m).get("name");
+                                    Object price = ((Map<?, ?>) m).get("extraPrice") != null
+                                            ? ((Map<?, ?>) m).get("extraPrice")
+                                            : ((Map<?, ?>) m).get("price");
+                                    if (name != null) {
+                                        if (price instanceof Number && ((Number) price).intValue() > 0) {
+                                            modNames.add(name + " (+" + String.format("%,d", ((Number) price).intValue()) + "₫)");
+                                        } else {
+                                            modNames.add(name.toString());
+                                        }
+                                    }
+                                }
+                            }
+                            if (!modNames.isEmpty()) {
+                                modText = String.join(", ", modNames);
+                            }
+                        }
+                    }
+
                     items.add(KdsTicketItemDto.builder()
                             .id((String) itemMap.get("id"))
                             .menuItemId((String) itemMap.get("menuItemId"))
@@ -27,10 +59,21 @@ public class KdsTicketMapper {
                             .quantity(itemMap.get("quantity") instanceof Number ? ((Number) itemMap.get("quantity")).intValue() : 1)
                             .note((String) itemMap.get("note"))
                             .status((String) itemMap.get("status"))
-                            .modifiersText((String) itemMap.get("modifiersText"))
+                            .modifiersText(modText)
                             .build());
                 }
             }
+        }
+
+        String orderTime = (String) map.get("orderTime");
+        if (orderTime == null || orderTime.isBlank()) {
+            orderTime = (String) map.get("timestamp");
+        }
+        if (orderTime == null || orderTime.isBlank()) {
+            orderTime = (String) map.get("createdAt");
+        }
+        if (orderTime == null || orderTime.isBlank()) {
+            orderTime = java.time.LocalDateTime.now().toString();
         }
 
         return KdsTicketDto.builder()
@@ -38,7 +81,7 @@ public class KdsTicketMapper {
                 .branchId((String) map.get("branchId"))
                 .tableId((String) map.get("tableId"))
                 .tableName((String) map.get("tableName"))
-                .orderTime((String) map.get("orderTime"))
+                .orderTime(orderTime)
                 .status((String) map.get("status"))
                 .items(items)
                 .build();

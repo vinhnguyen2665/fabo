@@ -4,6 +4,7 @@
   "private": true,
   "description": "Fabo POS Cloud Frontend Monorepo (React 19 + TypeScript + Vite + Tailwind CSS)",
   "scripts": {
+    "dev": "turbo run dev -- --host 0.0.0.0",
     "dev:pos": "pnpm --filter @fabo/pos-cashier dev",
     "dev:kds": "pnpm --filter @fabo/kds-kitchen dev",
     "dev:admin": "pnpm --filter @fabo/admin-portal dev",
